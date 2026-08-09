@@ -1,8 +1,8 @@
 """
 USDA Rail Dashboard Updater
 ----------------------------
-Run this script anytime you add new data to the Excel file.
-It will re-aggregate everything and overwrite the dashboard HTML automatically.
+Fetches live data from the USDA AMS API and rebuilds the dashboard HTML.
+Falls back to the local Excel file if the API is unreachable.
 
 Usage: double-click "Update Dashboard.bat" or run directly with Python.
 """
@@ -12,12 +12,14 @@ import json
 import re
 import sys
 import os
+import shutil
 from datetime import datetime
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 EXCEL_FILE = r'C:\Users\KoltenPostin\John Stewart and Associates\JSA - Documents\Research Analyst\Rail Shipment Project\Rail Data USDA.xlsx'
 HTML_FILE  = r'C:\Users\KoltenPostin\John Stewart and Associates\JSA - Documents\Research Analyst\Rail Shipment Project\USDA_Rail_Dashboard.html'
 SHEET_NAME = 'Data'
+USDA_APP_TOKEN = None   # Optional — paste free token from agtransport.usda.gov
 # ──────────────────────────────────────────────────────────────────────────────
 
 VALID_STATES = [
@@ -38,34 +40,40 @@ def log(msg):
 def fmt_num(n):
     return f"{n:,}"
 
-# ── Step 1: Read & clean data ──────────────────────────────────────────────────
-print("\n🌾 USDA Rail Dashboard Updater")
+# ── Step 1: Load data from API (fallback to Excel) ────────────────────────────
+print("\nUSDA Rail Dashboard Updater")
 print("=" * 40)
-log(f"Reading: {os.path.basename(EXCEL_FILE)}")
-
-if not os.path.exists(EXCEL_FILE):
-    print(f"\n❌ ERROR: Excel file not found at:\n   {EXCEL_FILE}")
-    input("\nPress Enter to exit...")
-    sys.exit(1)
 
 if not os.path.exists(HTML_FILE):
-    print(f"\n❌ ERROR: Dashboard HTML not found at:\n   {HTML_FILE}")
+    print(f"\nERROR: Dashboard HTML not found at:\n   {HTML_FILE}")
     input("\nPress Enter to exit...")
     sys.exit(1)
 
-df = pd.read_excel(EXCEL_FILE, sheet_name=SHEET_NAME)
-df['Est Bushels'] = pd.to_numeric(df['Est Bushels'], errors='coerce').fillna(0)
-df_clean = df[df['State'].isin(VALID_STATES)].copy()
+# Load data from API
+try:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import usda_api
+    log("Fetching data from USDA AMS API...")
+    df_api = usda_api.load_usda_data(app_token=USDA_APP_TOKEN)
+    # Keep only rows with valid 2-letter state codes (excludes KCS national total)
+    df_clean = df_api[df_api['State'].isin(VALID_STATES)].copy()
+    data_source = "USDA API"
+    log(f"API fetch successful.")
+except Exception as e:
+    print(f"\nERROR: Failed to fetch data from USDA API:\n   {e}")
+    input("\nPress Enter to exit...")
+    sys.exit(1)
 
-total_rows   = len(df)
-clean_rows   = len(df_clean)
+df_clean['MY Week'] = pd.to_numeric(df_clean['MY Week'], errors='coerce')
+
+total_rows   = len(df_clean)
 railroads    = sorted(df_clean['Railroad'].dropna().unique().tolist())
 market_years = sorted(df_clean['Market Year'].dropna().unique().tolist())
 
-log(f"Rows read:      {fmt_num(total_rows)}")
-log(f"Rows after clean: {fmt_num(clean_rows)}")
-log(f"Railroads:      {', '.join(railroads)}")
-log(f"Market years:   {market_years[0]} → {market_years[-1]}")
+log(f"Source:       {data_source}")
+log(f"Rows:         {fmt_num(total_rows)}")
+log(f"Railroads:    {', '.join(railroads)}")
+log(f"Market years: {market_years[0]} to {market_years[-1]}")
 print()
 
 # ── Step 2: Aggregate ──────────────────────────────────────────────────────────
@@ -176,6 +184,72 @@ for rr in railroads:
 
 states_with_data = [s for s in VALID_STATES if any(state_data[s].get(rr, 0) > 0 for rr in railroads)]
 
+# ── Progress Tab Data ──────────────────────────────────────────────────────────
+log("Computing progress tab data (MYtD vs LY vs 6-yr Olympic Avg)...")
+
+current_year  = market_years[-1]
+last_year_p   = market_years[-2] if len(market_years) >= 2 else None
+max_wk_p      = int(df_clean[df_clean['Market Year'] == current_year]['MY Week'].max())
+
+# 6 most recent complete years before current for olympic pool
+prior_yrs_p   = [y for y in market_years if y != current_year]
+oly_pool_p    = prior_yrs_p[-6:] if len(prior_yrs_p) >= 6 else prior_yrs_p
+
+def _oly_avg(vals):
+    v = sorted([x for x in vals if x > 0])
+    if len(v) >= 4: v = v[1:-1]   # drop highest and lowest
+    return int(sum(v) / len(v)) if v else 0
+
+def _pct(curr, base):
+    if not base: return None
+    return round((curr / base - 1) * 100, 1)
+
+# Efficient: pre-slice the dataframes once
+_c = df_clean[(df_clean['Market Year'] == current_year) & (df_clean['MY Week'] <= max_wk_p)]
+_l = df_clean[(df_clean['Market Year'] == last_year_p)  & (df_clean['MY Week'] <= max_wk_p)] if last_year_p else df_clean.iloc[0:0]
+_po = df_clean[df_clean['Market Year'].isin(oly_pool_p)  & (df_clean['MY Week'] <= max_wk_p)]
+
+def _rr_metric(rr=None):
+    def _s(d): return int((d[d['Railroad']==rr] if rr else d)['Est Bushels'].sum())
+    curr = _s(_c); ly = _s(_l)
+    pool = [_s(_po[_po['Market Year']==y]) for y in oly_pool_p]
+    oly  = _oly_avg(pool)
+    return {'current': curr, 'ly': ly, 'olympic_avg': oly,
+            'pct_ly': _pct(curr, ly), 'pct_avg': _pct(curr, oly)}
+
+def _state_metric(state, rr=None):
+    def _s(d):
+        d = d[d['State']==state]
+        return int((d[d['Railroad']==rr] if rr else d)['Est Bushels'].sum())
+    curr = _s(_c)
+    if curr == 0: return None
+    ly   = _s(_l)
+    pool = [_s(_po[_po['Market Year']==y]) for y in oly_pool_p]
+    oly  = _oly_avg(pool)
+    return {'current': curr, 'ly': ly, 'olympic_avg': oly,
+            'pct_ly': _pct(curr, ly), 'pct_avg': _pct(curr, oly)}
+
+prog_rr = {'All': _rr_metric()}
+for _rr in railroads:
+    prog_rr[_rr] = _rr_metric(_rr)
+
+prog_state = {}
+for _rk in ['All'] + railroads:
+    _ra = None if _rk == 'All' else _rk
+    prog_state[_rk] = {}
+    for _st in VALID_STATES:
+        _m = _state_metric(_st, _ra)
+        if _m: prog_state[_rk][_st] = _m
+
+progress = {
+    'current_year':  current_year,
+    'last_year':     last_year_p,
+    'max_week':      max_wk_p,
+    'olympic_years': oly_pool_p,
+    'rr_summary':    prog_rr,
+    'state_summary': prog_state,
+}
+
 output = {
     'railroads':               railroads,
     'market_years':            market_years,
@@ -191,6 +265,7 @@ output = {
     'weekly_data_by_rr':       weekly_data_by_rr,
     'weekly_data_by_state':    weekly_data_by_state,
     'weekly_data_by_rr_state': weekly_data_by_rr_state,
+    'progress':                progress,
 }
 
 # ── Step 3: Inject into HTML ───────────────────────────────────────────────────
@@ -216,11 +291,11 @@ if count == 0:
     # Diagnostic: show what the file actually has near "const DATA"
     idx = html.find('const DATA')
     if idx == -1:
-        print("\n❌ ERROR: 'const DATA' not found anywhere in the HTML file.")
+        print("\n[ERROR] ERROR: 'const DATA' not found anywhere in the HTML file.")
         print("   The script may be pointing at the wrong file.")
     else:
         snippet = html[idx:idx+120].replace('\n','↵').replace('\r','')
-        print("\n❌ ERROR: Found 'const DATA' but pattern did not match.")
+        print("\n[ERROR] ERROR: Found 'const DATA' but pattern did not match.")
         print(f"   Found at char {idx}: {snippet!r}")
         print("   Expected format: const DATA = {{...}};")
     input("\nPress Enter to exit...")
@@ -244,11 +319,25 @@ PUBLISH_FILE = os.path.join(PUBLISH_DIR, 'index.html')
 with open(PUBLISH_FILE, 'w', encoding='utf-8') as f:
     f.write(updated_html)
 
+# Copy logo into publish folder so Netlify can serve it
+LOGO_SRC = os.path.join(os.path.dirname(HTML_FILE), 'logo.png')
+LOGO_DST = os.path.join(PUBLISH_DIR, 'logo.png')
+if os.path.exists(LOGO_SRC):
+    shutil.copy2(LOGO_SRC, LOGO_DST)
+    log("Logo copied to publish folder")
+
+for favicon_file in ['favicon.ico', 'favicon-32.png', 'apple-touch-icon.png']:
+    src = os.path.join(os.path.dirname(HTML_FILE), favicon_file)
+    dst = os.path.join(PUBLISH_DIR, favicon_file)
+    if os.path.exists(src):
+        shutil.copy2(src, dst)
+        log(f"{favicon_file} copied to publish folder")
+
 size_kb = os.path.getsize(HTML_FILE) / 1024
 print()
-print("✅ Dashboard updated successfully!")
+print("[OK] Dashboard updated successfully!")
 log(f"File size: {size_kb:.0f} KB")
 log(f"Updated:   {datetime.now().strftime('%B %d, %Y at %I:%M %p')}")
 log(f"Publish copy: {PUBLISH_FILE}")
 print()
-input("Press Enter to close...")
+pass  # non-interactive safe
