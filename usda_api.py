@@ -40,6 +40,7 @@ Destination mapping:
 import requests
 import pandas as pd
 from datetime import date, timedelta
+from typing import Optional
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 API_URL    = "https://agtransport.usda.gov/resource/27k8-utc2.json"
@@ -98,7 +99,7 @@ def my_week(dt: date) -> int:
 
 
 # ── API Fetch ─────────────────────────────────────────────────────────────────
-def fetch_raw(app_token: str | None = None) -> list[dict]:
+def fetch_raw(app_token: Optional[str] = None) -> list:
     """
     Download all records from the USDA AMS rail dataset.
     Pass an app token to avoid throttling (free at agtransport.usda.gov).
@@ -130,7 +131,7 @@ def fetch_raw(app_token: str | None = None) -> list[dict]:
 
 
 # ── Transform ─────────────────────────────────────────────────────────────────
-def transform(rows: list[dict], kcs_mode: str = KCS_MODE) -> pd.DataFrame:
+def transform(rows: list, kcs_mode: str = KCS_MODE) -> pd.DataFrame:
     """
     Convert raw API rows to a DataFrame matching the Excel column schema.
     """
@@ -192,7 +193,7 @@ def transform(rows: list[dict], kcs_mode: str = KCS_MODE) -> pd.DataFrame:
 
 
 # ── Public entry point ────────────────────────────────────────────────────────
-def load_usda_data(app_token: str | None = None, kcs_mode: str = KCS_MODE) -> pd.DataFrame:
+def load_usda_data(app_token: Optional[str] = None, kcs_mode: str = KCS_MODE) -> pd.DataFrame:
     """Fetch + transform in one call. Use this from Streamlit."""
     rows = fetch_raw(app_token)
     return transform(rows, kcs_mode=kcs_mode)
