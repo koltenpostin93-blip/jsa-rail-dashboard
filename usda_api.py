@@ -100,27 +100,31 @@ def my_week(dt: date) -> int:
 # ── API Fetch ─────────────────────────────────────────────────────────────────
 def fetch_raw(app_token: str | None = None) -> list[dict]:
     """
-    Download all records from the USDA AMS rail dataset in one request.
-    44 k rows fit comfortably under the 50 000 row limit.
+    Download all records from the USDA AMS rail dataset.
     Pass an app token to avoid throttling (free at agtransport.usda.gov).
     """
     headers = {"X-App-Token": app_token} if app_token else {}
-    params  = {
-        "$limit":  50_000,
-        "$offset": 0,
-        "$order":  "date ASC",
-    }
-    resp = requests.get(API_URL, params=params, headers=headers, timeout=30)
-    resp.raise_for_status()
-    rows = resp.json()
+    rows = []
+    offset = 0
+    limit  = 50_000
 
-    # Safety: paginate if somehow > 50k rows appear in future
-    if len(rows) == 50_000:
-        more_params = dict(params)
-        more_params["$offset"] = 50_000
-        resp2 = requests.get(API_URL, params=more_params, headers=headers, timeout=30)
-        resp2.raise_for_status()
-        rows += resp2.json()
+    while True:
+        params = {"$limit": limit, "$offset": offset, "$order": "date ASC"}
+        for attempt in range(3):
+            try:
+                resp = requests.get(
+                    API_URL, params=params, headers=headers, timeout=120
+                )
+                resp.raise_for_status()
+                break
+            except requests.exceptions.Timeout:
+                if attempt == 2:
+                    raise
+        batch = resp.json()
+        rows.extend(batch)
+        if len(batch) < limit:
+            break
+        offset += limit
 
     return rows
 

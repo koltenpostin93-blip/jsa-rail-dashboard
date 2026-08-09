@@ -261,7 +261,12 @@ def load_df(token: str = ""):
     return df, "API", datetime.now().strftime("%b %d %Y %I:%M %p")
 
 
-_df_raw, _data_source, _last_updated = load_df(app_token)
+try:
+    _df_raw, _data_source, _last_updated = load_df(app_token)
+except Exception as e:
+    st.error(f"Failed to load USDA data: {e}")
+    st.info("Try clicking 'Refresh Data Now' in the sidebar, or check your connection.")
+    st.stop()
 
 # Expose a clean df; state-level views filter to VALID_STATES naturally
 # (KCS state='US' is excluded automatically from state charts/maps)
