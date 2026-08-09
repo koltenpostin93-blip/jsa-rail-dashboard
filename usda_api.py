@@ -101,26 +101,29 @@ def my_week(dt: date) -> int:
 # ── API Fetch ─────────────────────────────────────────────────────────────────
 def fetch_raw(app_token: Optional[str] = None) -> list:
     """
-    Download all records from the USDA AMS rail dataset.
+    Download rail records from the USDA AMS API.
+    Fetches the last 8 marketing years — sufficient for 6-yr olympic avg
+    plus current and prior year comparisons.
     Pass an app token to avoid throttling (free at agtransport.usda.gov).
     """
+    # 8 MY's back = ~Sep of (current_year - 8).
+    cutoff_year = date.today().year - 8
+    cutoff = f"{cutoff_year}-09-01T00:00:00.000"
+
     headers = {"X-App-Token": app_token} if app_token else {}
     rows = []
     offset = 0
     limit  = 50_000
 
     while True:
-        params = {"$limit": limit, "$offset": offset, "$order": "date ASC"}
-        for attempt in range(3):
-            try:
-                resp = requests.get(
-                    API_URL, params=params, headers=headers, timeout=120
-                )
-                resp.raise_for_status()
-                break
-            except requests.exceptions.Timeout:
-                if attempt == 2:
-                    raise
+        params = {
+            "$limit":  limit,
+            "$offset": offset,
+            "$order":  "date ASC",
+            "$where":  f"date >= '{cutoff}'",
+        }
+        resp = requests.get(API_URL, params=params, headers=headers, timeout=45)
+        resp.raise_for_status()
         batch = resp.json()
         rows.extend(batch)
         if len(batch) < limit:

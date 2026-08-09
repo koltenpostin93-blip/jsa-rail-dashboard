@@ -249,7 +249,7 @@ with st.sidebar:
     st.caption("KCS reported as national total only (no state breakdown).")
 
 
-@st.cache_data(ttl=3600, show_spinner="Fetching latest USDA rail data…")
+@st.cache_data(ttl=3600)
 def load_df(token: str = ""):
     """
     Load data from the USDA AMS API (cached 1 hr).
@@ -260,12 +260,22 @@ def load_df(token: str = ""):
     return df, "API", datetime.now().strftime("%b %d %Y %I:%M %p")
 
 
+# Check st.secrets for a server-side token (set in Streamlit Cloud Secrets)
+_secret_token = ""
 try:
-    _df_raw, _data_source, _last_updated = load_df(app_token)
-except Exception as e:
-    st.error(f"Failed to load USDA data: {e}")
-    st.info("Try clicking 'Refresh Data Now' in the sidebar, or check your connection.")
-    st.stop()
+    _secret_token = st.secrets.get("USDA_APP_TOKEN", "") or ""
+except Exception:
+    pass
+
+_effective_token = app_token or _secret_token
+
+with st.spinner("Fetching latest USDA rail data…"):
+    try:
+        _df_raw, _data_source, _last_updated = load_df(_effective_token)
+    except Exception as e:
+        st.error(f"Failed to load USDA data: {e}")
+        st.info("Try clicking 'Refresh Data Now' in the sidebar, or check your connection.")
+        st.stop()
 
 # Expose a clean df; state-level views filter to VALID_STATES naturally
 # (KCS state='US' is excluded automatically from state charts/maps)
