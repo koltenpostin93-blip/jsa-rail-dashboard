@@ -2,7 +2,6 @@
 USDA Rail Dashboard Updater
 ----------------------------
 Fetches live data from the USDA AMS API and rebuilds the dashboard HTML.
-Falls back to the local Excel file if the API is unreachable.
 
 Usage: double-click "Update Dashboard.bat" or run directly with Python.
 """
@@ -16,7 +15,6 @@ import shutil
 from datetime import datetime
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-EXCEL_FILE = r'C:\Users\KoltenPostin\John Stewart and Associates\JSA - Documents\Research Analyst\Rail Shipment Project\Rail Data USDA.xlsx'
 HTML_FILE  = r'C:\Users\KoltenPostin\John Stewart and Associates\JSA - Documents\Research Analyst\Rail Shipment Project\USDA_Rail_Dashboard.html'
 SHEET_NAME = 'Data'
 USDA_APP_TOKEN = None   # Optional — paste free token from agtransport.usda.gov
@@ -40,7 +38,7 @@ def log(msg):
 def fmt_num(n):
     return f"{n:,}"
 
-# ── Step 1: Load data from API (fallback to Excel) ────────────────────────────
+# ── Step 1: Load data from USDA API ──────────────────────────────────────────
 print("\nUSDA Rail Dashboard Updater")
 print("=" * 40)
 

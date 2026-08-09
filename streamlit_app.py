@@ -2,7 +2,6 @@
 JSA Grain Rail Shipments Dashboard
 ====================================
 Data source: USDA AMS agtransport.usda.gov (live API, cached 1 hr)
-Fallback:    Rail Data USDA.xlsx  (if API is unreachable)
 Run: streamlit run streamlit_app.py
 """
 
@@ -279,10 +278,6 @@ _src_badge = (
     "<span style='background:#1a3530;border:1px solid " + C['POS'] + ";"
     "color:" + C['POS'] + ";border-radius:4px;padding:2px 7px;font-size:10px;"
     "font-weight:600;margin-left:8px;'>&#9679; LIVE API</span>"
-    if _data_source == "API" else
-    "<span style='background:#2a1f10;border:1px solid " + C['GOLD'] + ";"
-    "color:" + C['GOLD'] + ";border-radius:4px;padding:2px 7px;font-size:10px;"
-    "font-weight:600;margin-left:8px;'>&#9632; EXCEL</span>"
 )
 
 st.markdown(f"""

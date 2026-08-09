@@ -17,7 +17,7 @@ Marketing Year convention:
     Sep 1 → Aug 31.  The week whose ending Friday falls in that window
     belongs to that marketing year.
 
-MY Week convention (confirmed against user's Excel):
+MY Week convention:
     Week 1 ends on the first Friday on or after Sep 1.
     Subsequent weeks count forward from there.
     Example: Sep 1 2014 = Monday → first Friday = Sep 5 → MY Week 1 ends Sep 5.
@@ -133,7 +133,7 @@ def fetch_raw(app_token: Optional[str] = None) -> list:
 # ── Transform ─────────────────────────────────────────────────────────────────
 def transform(rows: list, kcs_mode: str = KCS_MODE) -> pd.DataFrame:
     """
-    Convert raw API rows to a DataFrame matching the Excel column schema.
+    Convert raw API rows to a clean DataFrame.
     """
     df = pd.DataFrame(rows)
 
