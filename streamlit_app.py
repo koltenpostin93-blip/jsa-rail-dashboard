@@ -8,11 +8,8 @@ Run: streamlit run streamlit_app.py
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
 from pathlib import Path
 from datetime import datetime
-
-import usda_api  # local module — fetch + transform USDA rail data
 
 # ─────────────────────────────────────────────
 # PAGE CONFIG (must be first Streamlit call)
@@ -23,6 +20,20 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+
+# Import plotly AFTER set_page_config so any failure shows in the browser
+try:
+    import plotly.graph_objects as go
+except Exception as _plotly_err:
+    st.error(f"plotly import failed: {_plotly_err}")
+    st.stop()
+
+# Import local module AFTER set_page_config for the same reason
+try:
+    import usda_api
+except Exception as _usda_err:
+    st.error(f"usda_api import failed: {_usda_err}")
+    st.stop()
 
 # ─────────────────────────────────────────────
 # CONSTANTS & COLORS
