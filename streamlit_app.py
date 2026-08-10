@@ -786,10 +786,9 @@ with tab3:
         colorscale=colorscale,
         zmid=zmid,
         colorbar=dict(
-            title=z_label,
+            title=dict(text=z_label, font=dict(color=C["MID"])),
             tickformat=colorbar_tickformat,
             tickfont=dict(color=C["MID"]),
-            titlefont=dict(color=C["MID"]),
             bgcolor=C["CARD"],
             bordercolor=C["BORDER"],
         ),
