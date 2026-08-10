@@ -482,7 +482,7 @@ with tab1:
     tbl_df = pd.DataFrame(rr_rows)
     st.dataframe(
         tbl_df,
-        use_container_width=True,
+        width='stretch',
         hide_index=True,
         height=min(42 * (len(rr_rows) + 1) + 38, 500),
     )
@@ -535,7 +535,7 @@ with tab1:
     )
     rr_layout['xaxis'].update(tickformat='+.0f', ticksuffix='%')
     fig_rr.update_layout(**rr_layout)
-    st.plotly_chart(fig_rr, use_container_width=True)
+    st.plotly_chart(fig_rr, width='stretch')
 
     st.markdown("---")
 
@@ -627,7 +627,7 @@ with tab1:
     )
     st_layout['xaxis'].update(tickformat='+.0f', ticksuffix='%')
     fig_st.update_layout(**st_layout)
-    st.plotly_chart(fig_st, use_container_width=True)
+    st.plotly_chart(fig_st, width='stretch')
 
 
 # ══════════════════════════════════════════════
@@ -691,7 +691,7 @@ with tab2:
     lay2['xaxis'].update(categoryorder='array', categoryarray=MONTH_ORDER)
     lay2['yaxis'].update(tickformat='.2s')
     fig2.update_layout(**lay2)
-    st.plotly_chart(fig2, use_container_width=True)
+    st.plotly_chart(fig2, width='stretch')
 
 
 # ══════════════════════════════════════════════
@@ -806,7 +806,7 @@ with tab3:
     # Layout: map left, detail right
     map_col, detail_col = st.columns([3, 2])
     with map_col:
-        st.plotly_chart(fig3, use_container_width=True)
+        st.plotly_chart(fig3, width='stretch')
 
     with detail_col:
         st.markdown(f"<p style='color:{C['MID']}; font-size:0.8rem; margin-bottom:4px;'>State Detail</p>", unsafe_allow_html=True)
@@ -839,7 +839,7 @@ with tab3:
             )
             lay3b['xaxis'].update(tickformat='.2s')
             fig3b.update_layout(**lay3b)
-            st.plotly_chart(fig3b, use_container_width=True)
+            st.plotly_chart(fig3b, width='stretch')
 
 
 # ══════════════════════════════════════════════
@@ -898,7 +898,7 @@ with tab4:
         )
         lay4a['yaxis'].update(tickformat='.2s')
         fig4a.update_layout(**lay4a)
-        st.plotly_chart(fig4a, use_container_width=True)
+        st.plotly_chart(fig4a, width='stretch')
 
         # ── Cumulative line chart ─────────────
         fig4b = go.Figure()
@@ -919,7 +919,7 @@ with tab4:
         )
         lay4b['yaxis'].update(tickformat='.2s')
         fig4b.update_layout(**lay4b)
-        st.plotly_chart(fig4b, use_container_width=True)
+        st.plotly_chart(fig4b, width='stretch')
 
 
 # ══════════════════════════════════════════════
@@ -971,7 +971,7 @@ with tab5:
     )
     lay5['yaxis'].update(tickformat='.2s')
     fig5.update_layout(**lay5)
-    st.plotly_chart(fig5, use_container_width=True)
+    st.plotly_chart(fig5, width='stretch')
 
 
 # ══════════════════════════════════════════════
@@ -1048,7 +1048,7 @@ with tab6:
         )
         lay6a['yaxis'].update(tickformat='.2s')
         fig6a.update_layout(**lay6a)
-        st.plotly_chart(fig6a, use_container_width=True)
+        st.plotly_chart(fig6a, width='stretch')
 
         # ── Cumulative weekly line ────────────
         YEAR_PAL6 = [C["POS"], C["BLUE"], C["GOLD"], C["NEG"], "#a78bfa", "#fb923c"]
@@ -1072,4 +1072,4 @@ with tab6:
         )
         lay6b['yaxis'].update(tickformat='.2s')
         fig6b.update_layout(**lay6b)
-        st.plotly_chart(fig6b, use_container_width=True)
+        st.plotly_chart(fig6b, width='stretch')
