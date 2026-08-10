@@ -241,23 +241,29 @@ with st.sidebar:
         type="password",
         help="Free token from agtransport.usda.gov — increases rate limits.",
     )
-    if st.button("🔄 Refresh Data Now"):
+    if st.button("🔄 Refresh from Live API"):
         st.cache_data.clear()
+        st.session_state["force_api"] = True
         st.rerun()
-    st.caption("Data auto-refreshes every hour.")
+    st.caption("Dashboard loads from bundled data.\nUse button above for latest.")
     st.divider()
     st.caption("KCS reported as national total only (no state breakdown).")
 
 
+PARQUET_PATH = BASE / "data" / "rail_data.parquet"
+
+
 @st.cache_data(ttl=3600)
-def load_df(token: str = ""):
-    """
-    Load data from the USDA AMS API (cached 1 hr).
-    KCS records carry state='US' (national total — no state breakdown).
-    All other railroads have full state-level detail.
-    """
+def load_from_api(token: str = ""):
     df = usda_api.load_usda_data(app_token=token or None)
-    return df, "API", datetime.now().strftime("%b %d %Y %I:%M %p")
+    return df, datetime.now().strftime("%b %d %Y %I:%M %p")
+
+
+@st.cache_data
+def load_from_file():
+    df = pd.read_parquet(PARQUET_PATH)
+    ts = datetime.fromtimestamp(PARQUET_PATH.stat().st_mtime).strftime("%b %d %Y")
+    return df, ts
 
 
 # Check st.secrets for a server-side token (set in Streamlit Cloud Secrets)
@@ -269,13 +275,27 @@ except Exception:
 
 _effective_token = app_token or _secret_token
 
-with st.spinner("Fetching latest USDA rail data…"):
-    try:
-        _df_raw, _data_source, _last_updated = load_df(_effective_token)
-    except Exception as e:
-        st.error(f"Failed to load USDA data: {e}")
-        st.info("Try clicking 'Refresh Data Now' in the sidebar, or check your connection.")
-        st.stop()
+if st.session_state.get("force_api"):
+    with st.spinner("Fetching latest USDA data from API…"):
+        try:
+            _df_raw, _last_updated = load_from_api(_effective_token)
+            _data_source = "LIVE API"
+        except Exception as e:
+            st.error(f"API fetch failed: {e}")
+            st.session_state["force_api"] = False
+            st.rerun()
+else:
+    if PARQUET_PATH.exists():
+        _df_raw, _last_updated = load_from_file()
+        _data_source = "Bundled"
+    else:
+        with st.spinner("Fetching USDA data…"):
+            try:
+                _df_raw, _last_updated = load_from_api(_effective_token)
+                _data_source = "LIVE API"
+            except Exception as e:
+                st.error(f"Failed to load data: {e}")
+                st.stop()
 
 # Expose a clean df; state-level views filter to VALID_STATES naturally
 # (KCS state='US' is excluded automatically from state charts/maps)
@@ -284,11 +304,18 @@ df = _df_raw
 # ─────────────────────────────────────────────
 # BRANDED HEADER  (needs _data_source + _last_updated from load_df)
 # ─────────────────────────────────────────────
-_src_badge = (
-    "<span style='background:#1a3530;border:1px solid " + C['POS'] + ";"
-    "color:" + C['POS'] + ";border-radius:4px;padding:2px 7px;font-size:10px;"
-    "font-weight:600;margin-left:8px;'>&#9679; LIVE API</span>"
-)
+if _data_source == "LIVE API":
+    _src_badge = (
+        "<span style='background:#1a3530;border:1px solid " + C['POS'] + ";"
+        "color:" + C['POS'] + ";border-radius:4px;padding:2px 7px;font-size:10px;"
+        "font-weight:600;margin-left:8px;'>&#9679; LIVE API</span>"
+    )
+else:
+    _src_badge = (
+        "<span style='background:#1e2530;border:1px solid " + C['BLUE'] + ";"
+        "color:" + C['BLUE'] + ";border-radius:4px;padding:2px 7px;font-size:10px;"
+        "font-weight:600;margin-left:8px;'>&#9679; DATA AS OF " + _last_updated.upper() + "</span>"
+    )
 
 st.markdown(f"""
 <div style="
