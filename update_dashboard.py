@@ -15,8 +15,9 @@ import shutil
 from datetime import datetime
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-HTML_FILE  = r'C:\Users\KoltenPostin\John Stewart and Associates\JSA - Documents\Research Analyst\Rail Shipment Project\USDA_Rail_Dashboard.html'
-SHEET_NAME = 'Data'
+import pathlib
+_HERE = pathlib.Path(__file__).parent
+HTML_FILE  = str(_HERE / 'USDA_Rail_Dashboard.html')
 USDA_APP_TOKEN = None   # Optional — paste free token from agtransport.usda.gov
 # ──────────────────────────────────────────────────────────────────────────────
 
